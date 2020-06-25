@@ -39,7 +39,7 @@ knitr::opts_chunk$set(tidy = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 
 
-today <- Sys.Date() - 6
+today <- Sys.Date() - 7
 library(plyr)
 library(knitr)
 library(stringr)
@@ -111,13 +111,13 @@ The maps below summarise the in-country situations:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.  
-* Bottom row: overview of doubling time of cumulative reported cases (left) and deaths (right). Doubling times are estimated over a 7 day period up to `r format(today, "%d/%m/%Y")`. Doubling time is an easily understood measure of how fast the epidemic is growing when the case reproduction number, R, is greater than 1. The lower the doubling time the faster the national COVID-19 epidemic is growing. For individual country plots we use a related metric, the relative increase in the size of the national epidemic over the past 7 days. A relative increase of 2 corresponds to a doubling time of exactly 7 days.
+* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline, and R numbers reduce below 1, doubling times become inaccurate. The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting R values below 1. For individual country plots we use a related metric, the relative increase in the size of the national epidemic over the past 7 days. A relative increase of 2 corresponds to a doubling time of exactly 7 days.
 
 Caveats: 
 
 * Colour scales are non-linear and are re-calibrated every week.
 
-* WHO African region countries shaded in white either have no reported deaths/cases or, for doubling time calculations, have reduced their cumulative total cases/deaths in the last 7 days due to retrospective changes in reporting procedures.
+* WHO African region countries shaded in white either have no reported deaths/cases or, for weekly ratio calculations, have reduced their cumulative total cases/deaths in the last 7 days due to retrospective changes in reporting procedures.
 
 ## Summary maps
  
@@ -140,7 +140,7 @@ As of `r format(today, "%d/%m/%Y")`, each panel below shows for each country:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.   
-* Bottom row: relative increase in cumulative number of cases (left) and deaths (right) over the 7 day period leading up to `r format(today, "%d/%m/%Y")`. A relative increase of 2 corresponds to a doubling time of exactly 7 days.
+* Bottom row: relative increase in cumulative number of cases (left) and deaths (right) over the 7 day period leading up to `r format(today, "%d/%m/%Y")`.
 
 Caveats;
 
@@ -291,7 +291,7 @@ for( i in country_list){
   cat(paste0("\\ssubsection{",i,"}"))
   print(multi_plot)
   
-  country_summary_text <- country_summary_text_function(i, WHO_latest_day_cases_and_deaths_simulated, WHO_cases_and_deaths_doubling_time)
+  country_summary_text <- country_summary_text_function(i, WHO_latest_day_cases_and_deaths_simulated, WHO_cases_and_deaths_weekly_ratio %>% filter(date == today))
   
   cat(paste0(country_summary_text$sentence_1,
     country_summary_text$sentence_2,
@@ -323,18 +323,20 @@ An online version of the report is available  at [https://dimmestp.shinyapps.io/
 - Population counts from the World Bank (2018) https://data.worldbank.org/indicator/SP.POP.TOTL?locations=ZG (accessed 0900  30/03/2020).
 
 
-### Doubling time calculations
+### Weekly Ratio calculations
 
-Calculated over prior 7 days using method described by *E. Vynnycky & R. White (2010) An Introduction to Infectious Disease Modelling*, page 74.  
+We have used ratios of both cases and deaths in the past week compared to the previous week (i.e. the total over the last 7 days as a ratio of the total over the previous 7 days) to monitor the weekly rate of spread of COVID-19. Weekly totals are considered as they are less prone to week day variations than the daily values.  
+
+There is some analogy between the ratios presented and the R number, and values of less than 1 (or greater than 1) might be expected to correspond to R numbers of less than (or greater than) 1. While their values will not be identical, a rudimentary conversion based on a serial interval of 6.48 days (as used in the ICL model) indicates they would be similar. For example, a ratio of 0.70 would correspond to R=0.72, a ratio of 0.80 to R=0.813, and a ratio of 0.90 to R=0.91 (R=Ratio(6.48/7)). However, this analogy assumes uniform reporting over the two week period used to calculate each ratio. Furthermore it should be borne in mind
+that each statistic reflects a different manifestation of the virus, and none are fully representative of the true underlying rate of spread of infection in the whole population. Death ratios are heavily influenced by the rate of spread to and within older age groups, and take less account of the rate of spread in younger age groups. Similarly cases and hospital in-patients predominantly include those with more severe symptoms, and so do not fully capture the rate of infection spread within the whole population. Nevertheless these statistics have clear value for monitoring the impact of the virus on health service requirements, and will
+still serve as broad indicators of the underlying rate of spread of the virus occurring 3-4 weeks earlier.
   
-Confidence intervals calculated using bootstrapping of a simulated dataset with Poisson error structure, using method published here: https://doi.org/10.1101/2020.02.05.20020750.  
+Confidence intervals calculated using bootstrapping of a simulated dataset with Poisson error structure. 
 
 ### Caveats
 - Case count data are affected by any changes in testing strategy or testing effort over time and/or any variation in testing strategy or testing effort between regions.  
 - Case count data are likely a substantial under-representation of the true number of COVID-19 infections.  
 - Death data are considered more reliable but may lag behind case data by as much as 3 weeks.
-    
-- Countries that have reduced their cumulative total cases/deaths in the last 7 days are assigned a doubling time of -1.
 
 \newpage
 
@@ -413,42 +415,44 @@ kable(tab.total.deaths.10k)
 
 \newpage
 
-### Doubling time (cases)
+### Weekly Ratio (cases)
 
-<!-- The following two tables summarise the doubling times (for cumulative reported cases and deaths respectively) reported in the above figures. Note that a "NA" value notifies countries where no cases/deaths have been reported yet or have if the first cases/deaths occured less than 7 days ago, preventing the computation of doubling time over the chosen 7 day period. A "Inf" value notifies countries where cases/deaths have been reported more than 7 days ago but have not increased since, leading to a zero denominator quotient in the doubling time calculation. A "Inf" value may appear for the 95% CIs while an estimated doubling time is provided. This occurs when the number of cases/deaths is still very low, leading to the common occurence of flat epicurves in the simulated Poisson error bootstrap from which the confidence intervals are estimated. More cases/deaths are required to provide more reliable 95% CIs in those cases. -->
+<!-- The following two tables summarise the weekly ratios (for cumulative reported cases and deaths respectively) reported in the above figures. Note that a "NA" value notifies countries where no cases/deaths have been reported yet or have if the first cases/deaths occured less than 7 days ago, preventing the computation of weekly ratio over the chosen 7 day period. A "Inf" value notifies countries where cases/deaths have been reported more than 7 days ago but have not increased since, leading to a zero denominator quotient in the weekly ratio calculation. A "Inf" value may appear for the 95% CIs while an estimated weekly ratio is provided. This occurs when the number of cases/deaths is still very low, leading to the common occurence of flat epicurves in the simulated Poisson error bootstrap from which the confidence intervals are estimated. More cases/deaths are required to provide more reliable 95% CIs in those cases. -->
 
-```{r DtTabIncidence, results = 'asis', echo = FALSE}
-Td.report.appendix<- 
-WHO_cases_and_deaths_doubling_time %>%
+```{r WRTabIncidence, results = 'asis', echo = FALSE}
+WR.report.appendix<- 
+WHO_cases_and_deaths_weekly_ratio %>%
   ungroup() %>%
+  filter(date == today) %>%
   transmute(Country = country,
-         `Doubling time (days)` = cases_doubling_time,
-         `95%CI lower` = cases_ci_low,
-         `95%CI upper` = cases_ci_upp) %>%
-  arrange(desc(`Doubling time (days)`))
+         `Weekly Ratio` = ratio_c,
+         `95%CI lower` = lci_c,
+         `95%CI upper` = uci_c) %>%
+  arrange(desc(`Weekly Ratio`))
 
-Td.report.appendix$`Doubling time (days)`[is.infinite(Td.report.appendix$`Doubling time (days)`)] <- NA
+WR.report.appendix$`Weekly Ratio`[is.infinite(WR.report.appendix$`Weekly Ratio`)] <- NA
 
-kable(Td.report.appendix %>% arrange(`Doubling time (days)`), row.names = FALSE)
+kable(WR.report.appendix, row.names = FALSE)
 ```
 
 \newpage
 
-### Doubling time (deaths)
+### Weekly Ratio (deaths)
 ```{r DtTabDeaths, results = 'asis', echo = FALSE}
 
-Td.report.appendix.deaths<- 
-WHO_cases_and_deaths_doubling_time %>%
+WR.report.appendix.deaths<- 
+WHO_cases_and_deaths_weekly_ratio %>%
   ungroup() %>%
+  filter(date == today) %>%
   transmute(Country = country,
-         `Doubling time (days)` = deaths_doubling_time,
-         `95%CI lower` = deaths_ci_low,
-         `95%CI upper` = deaths_ci_upp) %>%
-  arrange(desc(`Doubling time (days)`))
+         `Weekly Ratio` = ratio_d,
+         `95%CI lower` = lci_d,
+         `95%CI upper` = uci_d) %>%
+  arrange(desc(`Weekly Ratio`))
 
-Td.report.appendix.deaths$`Doubling time (days)`[is.infinite(Td.report.appendix.deaths$`Doubling time (days)`)] <- NA
+WR.report.appendix.deaths$`Weekly Ratio`[is.infinite(WR.report.appendix.deaths$`Weekly Ratio`)] <- NA
 
-kable(Td.report.appendix.deaths %>% arrange(`Doubling time (days)`), row.names = FALSE)
+kable(WR.report.appendix.deaths, row.names = FALSE)
 
 ```
 

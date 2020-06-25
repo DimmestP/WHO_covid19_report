@@ -5,7 +5,7 @@
 
 # 1) SET UP ----
 
-today<- Sys.Date() - 6 # Set date as to that of the data to fetch.
+today<- Sys.Date() - 7 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
@@ -274,17 +274,18 @@ WHO_cases_and_deaths_7_day_increase$date[WHO_cases_and_deaths_7_day_increase$dat
 
 # MAPS  ----
 
-who_dt_data<- # Assemble the doubling times formatted for maps plotting
+who_WR_data<- # Assemble the weekly ratios formatted for maps plotting
   who_country_aliases_and_populations[,c('ISO3', 'country')] %>%
-  left_join(WHO_cases_and_deaths_doubling_time %>%
-              select(country,cases_doubling_time,deaths_doubling_time), by = 'country') %>%
-  rename(Dt_cases = cases_doubling_time,
-         Dt_deaths = deaths_doubling_time,
+  left_join(WHO_cases_and_deaths_weekly_ratio %>%
+              filter(date == today) %>%
+              select(country,ratio_c,ratio_d), by = 'country') %>%
+  rename(WR_cases = ratio_c,
+         WR_deaths = ratio_d,
          countryterritoryCode = ISO3)
 
 # Set the NA and Inf Dt to zero, so that they appear in white on the maps
-who_dt_data$Dt_cases[!is.finite(who_dt_data$Dt_cases)]<- 0 
-who_dt_data$Dt_deaths[!is.finite(who_dt_data$Dt_deaths)]<- 0
+who_WR_data$WR_cases[!is.finite(who_WR_data$WR_cases)]<- 0 
+who_WR_data$WR_deaths[!is.finite(who_WR_data$WR_deaths)]<- 0
 
 
 
@@ -356,33 +357,31 @@ text(-24, -30, 'No death reported', adj = 0)
 dev.off()
 
 
-# Map Dt CASES ----
-africa@data %<>% left_join(who_dt_data %>% select(-country), by=c("ISO_A3"="countryterritoryCode"))
+# Map WR CASES ----
+africa@data %<>% left_join(who_WR_data %>% select(-country), by=c("ISO_A3"="countryterritoryCode"))
 
 
 
-breaks <- classIntervals(africa@data$Dt_cases, n = 9, style = "jenks", na.rm=T)$brks
+breaks <- classIntervals(africa@data$WR_cases, n = 9, style = "jenks", na.rm=T)$brks
 breaks[2]<-0.00001
 palgreen <- brewer.pal(9, name = "Greens")
-palgreen <- rev(palgreen)
 palgreen[1]<-"#FFFFFF"
-png(filename = paste0('./output/Map_dt_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
-choroLayer(spdf = africa, var = "Dt_cases", colNA = "grey", legend.nodata = "Non WHO Afro country",
-           breaks=breaks, col=palgreen, legend.title.txt = "Days", legend.title.cex = 1, 
+png(filename = paste0('./output/Map_WR_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
+choroLayer(spdf = africa, var = "WR_cases", colNA = "grey", legend.nodata = "Non WHO Afro country",
+           breaks=breaks, col=palgreen, legend.title.txt = "Ratio", legend.title.cex = 1, 
            legend.values.cex = 1, legend.values.rnd = 3, legend.pos = c(-30,-35))
 points(-23.3, -31, pch = 16, col = 'white', cex = 2)
 text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
 dev.off()
 
 # Map Dt DEATHS ----
-breaks <- classIntervals(africa@data$Dt_deaths, n = 6, style = "jenks", na.rm=T)$brks
+breaks <- classIntervals(africa@data$WR_deaths, n = 6, style = "jenks", na.rm=T)$brks
 breaks[2]<-0.00001
 palgreen <- brewer.pal(7, name = "Greens")
-palgreen <- rev(palgreen)
 palgreen[1]<-"#FFFFFF"
-png(filename = paste0('./output/Map_dt_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
-choroLayer(spdf = africa, var = "Dt_deaths", colNA = "grey", legend.nodata = "Non WHO Afro country",
-           breaks=breaks, col=palgreen,legend.title.txt = "Days", legend.title.cex = 1, 
+png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
+choroLayer(spdf = africa, var = "WR_deaths", colNA = "grey", legend.nodata = "Non WHO Afro country",
+           breaks=breaks, col=palgreen,legend.title.txt = "Ratio", legend.title.cex = 1, 
            legend.values.cex = 1, legend.values.rnd = 3, legend.pos = c(-30,-35))
 points(-23.3, -31, pch = 16, col = 'white', cex = 2)
 text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
@@ -398,8 +397,8 @@ image1 <- image_read(paste0("./output/Map_cum_cases_", today, "_.png"))
 image2 <- image_read(paste0("./output/Map_cases_10k_pop_", today, "_.png"))
 image3 <- image_read(paste0("./output/Map_cum_deaths_", today, "_.png"))
 image4 <- image_read(paste0("./output/Map_deaths_10k_pop_", today, "_.png"))
-image5 <- image_read(paste0("./output/Map_dt_cases_", today, "_.png"))
-image6 <- image_read(paste0("./output/Map_dt_deaths_", today, "_.png"))
+image5 <- image_read(paste0("./output/Map_WR_cases_", today, "_.png"))
+image6 <- image_read(paste0("./output/Map_WR_deaths_", today, "_.png"))
 
 #Crop images
 image1_crop <- image_crop(image1, "1080x960+420+140")
@@ -422,9 +421,9 @@ plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'CUMU
 rasterImage(image2_crop, 0, 0, 1,1)
 plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'CUMULATIVE REPORTED DEATHS PER 10k POPULATION', cex.main = 2)
 rasterImage(image4_crop, 0, 0, 1,1)
-plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'DOUBLING TIME CASES', cex.main = 2)
+plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'WEEKLY RATIO CASES', cex.main = 2)
 rasterImage(image5_crop, 0, 0, 1,1)
-plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'DOUBLING TIME DEATHS', cex.main = 2)
+plot(NA, xlim=0:1, ylim=0:1, bty="n", axes=0, xaxs = 'i', yaxs='i', main = 'WEEKLY RATIO DEATHS', cex.main = 2)
 rasterImage(image6_crop, 0, 0, 1,1)
 dev.off()
 

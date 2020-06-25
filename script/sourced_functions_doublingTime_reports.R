@@ -9,7 +9,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # function to check that no cases/deaths have been redacted over the last 7 day window
-# as this would make any doubling time calculations impossible
+# as this would make any weekly ratio calculations impossible
 eight_day_pos_window <- function(positive){
   postive_window <- vector(length = length(positive))
   i <- 1
@@ -24,7 +24,7 @@ eight_day_pos_window <- function(positive){
   return(postive_window)
 }
 
-# function to calculate the poisson error in a count/doubling time if value can be calulated
+# function to calculate the poisson error in a count/weekly ratio if value can be calulated
 rpois_error <- function(iterations, observation, positive){
   if(positive) return(rpois(iterations,observation))
   else return(NA)
@@ -58,7 +58,7 @@ sim_cum_calc_per_pop <- function(sim_obs_vector_of_lists,population,positive){
   else return(NA)
 }
 
-# function to calculate doubling times for a given window
+# function to calculate weekly ratios for a given window
 compute.td<- function(seven_day_separation){
   Td<- round(7/(log2(seven_day_separation[2]/seven_day_separation[1])), 1)
   ifelse(seven_day_separation[2]==0|seven_day_separation[1]==0, NA, Td)
@@ -79,7 +79,7 @@ Td.lapply<- function(cum_num_obs,date, t1, t2, positive,iteration){
 }
 
 # function to construct summary sentences for the text below the country specific graphs
-country_summary_text_function <- function(i, WHO_latest_day_cases_and_deaths_simulated, WHO_cases_and_deaths_doubling_time) {
+country_summary_text_function <- function(i, WHO_latest_day_cases_and_deaths_simulated, WHO_cases_and_deaths_weekly_ratio) {
   currrent_country_latest_cases <- WHO_latest_day_cases_and_deaths_simulated %>%
     filter(country == i) %>%
     pull(last_day_case_obs)
@@ -120,52 +120,52 @@ country_summary_text_function <- function(i, WHO_latest_day_cases_and_deaths_sim
     filter(country == i) %>%
     pull(rank)
   
-  current_country_cases_dt <- WHO_cases_and_deaths_doubling_time  %>%
+  current_country_cases_WR <- WHO_cases_and_deaths_weekly_ratio  %>%
     filter(country == i) %>%
-    pull(cases_doubling_time)
+    pull(ratio_c)
   
-  current_country_cases_dt_rank <- WHO_cases_and_deaths_doubling_time %>%
-    filter(cases_doubling_time > -1) %>%
+  current_country_cases_WR_rank <- WHO_cases_and_deaths_weekly_ratio %>%
+    filter(ratio_c > -1) %>%
     ungroup() %>%
-    arrange(cases_doubling_time) %>%
+    arrange(desc(ratio_c)) %>%
     mutate(rank = 1:length(country)) %>%
     filter(country == i) %>%
     pull(rank)
   
-  current_country_deaths_dt <- WHO_cases_and_deaths_doubling_time %>%
+  current_country_deaths_WR <- WHO_cases_and_deaths_weekly_ratio %>%
     filter(country == i) %>%
-    pull(deaths_doubling_time)
+    pull(ratio_d)
   
-  current_country_deaths_dt_rank <- WHO_cases_and_deaths_doubling_time %>%
-    filter(deaths_doubling_time > -1) %>%
+  current_country_deaths_WR_rank <- WHO_cases_and_deaths_weekly_ratio %>%
+    filter(ratio_d > -1) %>%
     ungroup() %>%
-    arrange(deaths_doubling_time) %>%
+    arrange(ratio_d) %>%
     mutate(rank = 1:length(country)) %>%
     filter(country == i) %>%
     pull(rank)
   
-  if(current_country_cases_dt %in% c(Inf,-1,NA) | current_country_deaths_dt %in% c(Inf,-1,NA)){
+  if(current_country_cases_WR %in% c(Inf,-1,NA) | current_country_deaths_WR %in% c(Inf,-1,NA)){
     
-    if(current_country_cases_dt %in% c(Inf,-1,NA) & current_country_deaths_dt %in% c(Inf,-1,NA)){
-      if(current_country_cases_dt %in% c(Inf,NA)) sentence_3 = " The doubling time of reported cases cannot be calculated as no new cases have been reported in last 7 days."
-      else sentence_3 = " The doubling time of reported cases cannot be calculated as some cases have been redacted in last 7 days."
-      if(current_country_deaths_dt %in% c(Inf,NA)) sentence_4 = " The doubling time of reported deaths cannot be calculated as no new deaths have been reported in last 7 days."
-      else sentence_4 = " The doubling time of reported deaths cannot be calculated as some deaths have been redacted in last 7 days."
+    if(current_country_cases_WR %in% c(Inf,-1,NA) & current_country_deaths_WR %in% c(Inf,-1,NA)){
+      if(current_country_cases_WR %in% c(Inf,NA)) sentence_3 = " The weekly ratio of reported cases cannot be calculated as no new cases have been reported in last 7 days."
+      else sentence_3 = " The weekly ratio of reported cases cannot be calculated as some cases have been redacted in last 7 days."
+      if(current_country_deaths_WR %in% c(Inf,NA)) sentence_4 = " The weekly ratio of reported deaths cannot be calculated as no new deaths have been reported in last 7 days."
+      else sentence_4 = " The weekly ratio of reported deaths cannot be calculated as some deaths have been redacted in last 7 days."
     }
-    else if(current_country_cases_dt %in% c(Inf,-1,NA)){
-      if(current_country_cases_dt %in% c(Inf,NA)) sentence_3 = " The doubling time of reported cases cannot be calculated as no new cases have been reported in last 7 days."
-      else sentence_3 = " The doubling time of reported cases cannot be calculated as some cases have been redacted in last 7 days."
-      sentence_4 = paste0(" The doubling time of reported deaths over the last 7 days is ", current_country_deaths_dt, " days (", toOrdinal(current_country_deaths_dt_rank),").")
+    else if(current_country_cases_WR %in% c(Inf,-1,NA)){
+      if(current_country_cases_WR %in% c(Inf,NA)) sentence_3 = " The weekly ratio of reported cases cannot be calculated as no new cases have been reported in last 7 days."
+      else sentence_3 = " The weekly ratio of reported cases cannot be calculated as some cases have been redacted in last 7 days."
+      sentence_4 = paste0(" The weekly ratio of reported deaths over the last 7 days is ", signif(current_country_deaths_WR,2), " days (", toOrdinal(current_country_deaths_WR_rank),").")
     }
     else{
-      if(current_country_deaths_dt %in% c(Inf,NA)) sentence_4 = " The doubling time of reported deaths cannot be calculated as no new deaths have been reported in last 7 days."
-      else sentence_4 = " The doubling time of reported deaths cannot be calculated as some deaths have been redacted in last 7 days."
-      sentence_3 = paste0(" The doubling time of reported cases over the last 7 days  is ", current_country_cases_dt, " days (", toOrdinal(current_country_cases_dt_rank), ").")
+      if(current_country_deaths_WR %in% c(Inf,NA)) sentence_4 = " The weekly ratio of reported deaths cannot be calculated as no new deaths have been reported in last 7 days."
+      else sentence_4 = " The weekly ratio of reported deaths cannot be calculated as some deaths have been redacted in last 7 days."
+      sentence_3 = paste0(" The weekly ratio of reported cases over the last 7 days  is ", signif(current_country_cases_WR,2), " days (", toOrdinal(current_country_cases_WR_rank), ").")
     }
     
   }
   else {
-    sentence_3 = paste0(" The doubling times of reported cases and deaths over the last 7 days are ", current_country_cases_dt, " days (", toOrdinal(current_country_cases_dt_rank), ") and ", current_country_deaths_dt, " days (", toOrdinal(current_country_deaths_dt_rank),").")
+    sentence_3 = paste0(" The weekly ratios of reported cases and deaths over the last 7 days are ", signif(current_country_cases_WR,2), " days (", toOrdinal(current_country_cases_WR_rank), ") and ", signif(current_country_deaths_WR,2), " days (", toOrdinal(current_country_deaths_WR_rank),").")
     sentence_4 = NULL
   }
   tibble(
