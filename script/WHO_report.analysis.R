@@ -5,7 +5,7 @@
 
 # 1) SET UP ----
 
-today<- Sys.Date() - 7 # Set date as to that of the data to fetch.
+today<- Sys.Date() - 8 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
@@ -89,15 +89,20 @@ if(sum(is.na(WHO_cases_and_deaths$cases)) > 0 | sum(is.na(WHO_cases_and_deaths$d
 who_countrywide_data<- read_excel(paste0('./data/', today, '/WHO_Africa_data_', today, '.xlsx'), sheet = 'data for map') 
 
 # Calculate the current weekly ratio with confidence intervals
-weekly_ratios_ci <- function(A, B){
-  
-  e <- sqrt(1/A + 1/B)
-  
-  est <- c(exp(log(A/B) - e * 1.96),
-           exp(log(A/B) + e * 1.96))
-  
-  tab <- tibble(type = c("ratio_m","lci", "uci"),
-                est = c(A/B, est[[1]], est[[2]]))
+weekly_ratios_ci <- function(A, B, altered){
+  if(altered > 0){
+    tab <- tibble(type = c("ratio_m","lci", "uci"),
+              est = c(-1, NA, NA))
+  }
+  else {
+    e <- sqrt(1/A + 1/B)
+    
+    est <- c(exp(log(A/B) - e * 1.96),
+             exp(log(A/B) + e * 1.96))
+    
+    tab <- tibble(type = c("ratio_m","lci", "uci"),
+                  est = c(A/B, est[[1]], est[[2]]))
+  }
   return(tab)
   
 }
@@ -109,17 +114,18 @@ weekly_ratios_2 <- function(df, outcome, smooth_by = 7){
     subset(date >= lubridate::ymd("2020-02-20")) %>%
     filter(!is.na(.data[[outcome]])) %>% 
     group_by(country) %>%
-    mutate(change = roll_sumr(.data[[outcome]], n = smooth_by),
+    mutate(altered = .data[[outcome]] < 0, 
+           altered_window = roll_sumr(altered, n = smooth_by * 2),
+           change = roll_sumr(.data[[outcome]], n = smooth_by),
            change_prev = lag(change, n = smooth_by),
            ratio = change/change_prev) %>%
-    mutate(comparison = if_else(ratio >1, "greater than", "less than")) %>%
     ungroup()
   
   df_long <- df %>%
     filter(!is.na(ratio) & !is.infinite(ratio)) %>%
     group_by(country,date) %>%
     nest() %>%
-    mutate(tab = map(data, ~ weekly_ratios_ci(.x$change, .x$change_prev))) %>%
+    mutate(tab = map(data, ~ weekly_ratios_ci(.x$change, .x$change_prev, .x$altered_window))) %>%
     mutate(ratio = map_dbl(tab, ~parse_number(as.character((.x[1,2]))))) %>%
     mutate(lci = map_dbl(tab, ~parse_number(as.character((.x[2,2]))))) %>% 
     mutate(uci = map_dbl(tab, ~parse_number(as.character((.x[3,2]))))) %>% 

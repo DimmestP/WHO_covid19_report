@@ -39,7 +39,7 @@ knitr::opts_chunk$set(tidy = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 
 
-today <- Sys.Date() - 7
+today <- Sys.Date() - 8
 library(plyr)
 library(knitr)
 library(stringr)
@@ -111,13 +111,13 @@ The maps below summarise the in-country situations:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.  
-* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline, and R numbers reduce below 1, doubling times become inaccurate. The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting R values below 1. For individual country plots we use a related metric, the relative increase in the size of the national epidemic over the past 7 days. A relative increase of 2 corresponds to a doubling time of exactly 7 days.
+* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline, and R numbers reduce below 1, doubling times become unreliable The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting R values below 1. For individual country plots we use a related metric, the relative increase in the size of the national epidemic over the past 7 days.
 
 Caveats: 
 
 * Colour scales are non-linear and are re-calibrated every week.
 
-* WHO African region countries shaded in white either have no reported deaths/cases or, for weekly ratio calculations, have reduced their cumulative total cases/deaths in the last 7 days due to retrospective changes in reporting procedures.
+* WHO African region countries shaded in white either have no reported deaths/cases or, for weekly ratio calculations, have reduced their cumulative total cases/deaths in the last 14 days due to retrospective changes in reporting procedures.
 
 ## Summary maps
  
