@@ -39,7 +39,7 @@ knitr::opts_chunk$set(tidy = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 
 
-today <- Sys.Date() - 14
+today <- Sys.Date() - 15
 library(plyr)
 library(knitr)
 library(stringr)
@@ -155,7 +155,7 @@ for( i in country_list){
     mutate(current_country = (country == i))
   
  current_country_WR <-  WHO_cases_and_deaths_weekly_ratio %>%
-   filter(date > today - 8) %>%
+   filter(date == today) %>%
    mutate(current_country = (country == i))
  
   
