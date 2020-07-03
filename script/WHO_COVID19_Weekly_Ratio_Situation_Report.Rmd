@@ -39,7 +39,7 @@ knitr::opts_chunk$set(tidy = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 
 
-today <- Sys.Date() - 8
+today <- Sys.Date() - 14
 library(plyr)
 library(knitr)
 library(stringr)
@@ -111,7 +111,7 @@ The maps below summarise the in-country situations:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.  
-* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline, and R numbers reduce below 1, doubling times become unreliable The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting R values below 1. For individual country plots we use a related metric, the relative increase in the size of the national epidemic over the past 7 days.
+* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline doubling times become unreliable. The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting the epidemic is slowing.
 
 Caveats: 
 
@@ -140,7 +140,7 @@ As of `r format(today, "%d/%m/%Y")`, each panel below shows for each country:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.   
-* Bottom row: relative increase in cumulative number of cases (left) and deaths (right) over the 7 day period leading up to `r format(today, "%d/%m/%Y")`.
+* Bottom row: weekly ratio of cumulative number of cases (left) and deaths (right) ending on the last 7 days leading up to `r format(today, "%d/%m/%Y")`.
 
 Caveats;
 
@@ -154,13 +154,10 @@ for( i in country_list){
   current_country_data <- WHO_cases_and_deaths%>% 
     mutate(current_country = (country == i))
   
- current_country_increase_cases <-  WHO_cases_and_deaths_7_day_increase %>%
-   filter(cum_cases_relative_increase >= 1) %>%
+ current_country_WR <-  WHO_cases_and_deaths_weekly_ratio %>%
+   filter(date > today - 8) %>%
    mutate(current_country = (country == i))
  
- current_country_increase_deaths <-  WHO_cases_and_deaths_7_day_increase %>%
-   filter(cum_deaths_relative_increase >= 1) %>%
-   mutate(current_country = (country == i))
   
   # scale graphs according to current country
   current_country_max_cases <- current_country_data %>% 
@@ -183,15 +180,25 @@ for( i in country_list){
     pull(cum_deaths_per_10k) %>%
     max()
   
-  current_country_max_cases_relative_increase <- current_country_increase_cases %>% 
+  current_country_max_cases_WR <- current_country_WR %>% 
     filter(current_country) %>%
-    pull(cum_cases_relative_increase) %>%
+    pull(ratio_c) %>%
     max()
   
-  current_country_max_deaths_relative_increase <- current_country_increase_deaths %>% 
+  current_country_max_deaths_WR <- current_country_WR %>% 
     filter(current_country) %>%
-    pull(cum_deaths_relative_increase) %>%
+    pull(ratio_d) %>%
     max()
+  
+  current_country_min_cases_WR <- current_country_WR %>% 
+    filter(current_country) %>%
+    pull(ratio_c) %>%
+    min()
+  
+  current_country_min_deaths_WR <- current_country_WR %>% 
+    filter(current_country) %>%
+    pull(ratio_d) %>%
+    min()
   
   # plot cases
   cases_plot <- ggplot() +
@@ -258,24 +265,24 @@ for( i in country_list){
     scale_x_date(date_labels = "%b %d",breaks=c(today-105,today-84,today-63,today-42,today-21,today),limits = c(current_country_data %>% distinct(date) %>% pull(date) %>% min(),today))  +
     coord_cartesian(ylim = c(0.00005,ifelse(current_country_max_deaths_per_10k > 0.01, current_country_max_deaths_per_10k,0.01)))
  
-  # plot 7 day case increase
+  # plot last 7 cases weekly ratios
   seven_day_cum_cases <- ggplot() +
-    geom_line(data = current_country_increase_cases %>% filter(!current_country), aes(x=date,y=cum_cases_relative_increase,group = country),colour = "lightgray") +
-    geom_line(data = current_country_increase_cases %>% filter(current_country), aes(x=date,y=cum_cases_relative_increase,group=NULL),colour="black",size = 0.8) +
-    labs(x="Date", y = " Relative increase") +
+    geom_line(data = current_country_WR %>% filter(!current_country), aes(x=date,y=ratio_c,group = country),colour = "lightgray") +
+    geom_line(data = current_country_WR %>% filter(current_country), aes(x=date,y=ratio_c,group=NULL),colour="black",size = 0.8) +
+    labs(x="Date", y = "Weekly Ratio") +
     theme_classic(base_size = 15) +
     scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today)) +
-    coord_cartesian(ylim = c(1,ifelse(current_country_max_cases_relative_increase > 1.5, current_country_max_cases_relative_increase,1.5)))
+    coord_cartesian(ylim = c(ifelse(current_country_min_cases_WR > -1, -1, current_country_min_cases_WR),ifelse(current_country_max_cases_WR < 4, 4, current_country_max_cases_WR)))
   
-   # plot 7 day deaths increase
+   # plot last 7 deaths weekly ratios
   seven_day_cum_deaths <- ggplot() +
-    geom_line(data = current_country_increase_deaths %>% filter(!current_country), aes(x=date,y=cum_deaths_relative_increase,group = country),colour="lightgray") +
-    geom_line(data = current_country_increase_deaths %>% filter(current_country), aes(x=date,y=cum_deaths_relative_increase,group=NULL),colour="black",size = 0.8) +
+    geom_line(data = current_country_WR %>% filter(!current_country), aes(x=date,y=ratio_d,group = country),colour="lightgray") +
+    geom_line(data = current_country_WR %>% filter(current_country), aes(x=date,y=ratio_d,group=NULL),colour="black",size = 0.8) +
     labs(x="Date") +
     theme_classic(base_size = 15) +
     theme(axis.title.y = element_blank()) +
     scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today)) +
-    coord_cartesian(ylim = c(1,ifelse(current_country_max_deaths_relative_increase > 1.5, current_country_max_deaths_relative_increase,1.5)))
+    coord_cartesian(ylim = c(ifelse(current_country_min_deaths_WR > -1, -1, current_country_min_deaths_WR), ifelse(current_country_max_deaths_WR < 4, 4 , current_country_max_deaths_WR)))
     
   
   # combine plots

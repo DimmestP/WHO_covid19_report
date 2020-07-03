@@ -144,10 +144,6 @@ country_summary_text_function <- function(i, WHO_latest_day_cases_and_deaths_sim
     filter(country == i) %>%
     pull(rank)
   
-  ratio_d_below_1 <- ifelse( (WHO_cases_and_deaths_weekly_ratio %>% filter(country == i) %>% pull(uci_d)) > 1 , "is not", "is")
-  
-  ratio_c_below_1 <- ifelse( (WHO_cases_and_deaths_weekly_ratio %>% filter(country == i) %>% pull(uci_c)) > 1 , "is not", "is")
-  
   if(current_country_cases_WR %in% c(Inf,-1,NA) | current_country_deaths_WR %in% c(Inf,-1,NA)){
     
     if(current_country_cases_WR %in% c(Inf,-1,NA) & current_country_deaths_WR %in% c(Inf,-1,NA)){
@@ -159,17 +155,17 @@ country_summary_text_function <- function(i, WHO_latest_day_cases_and_deaths_sim
     else if(current_country_cases_WR %in% c(Inf,-1,NA)){
       if(current_country_cases_WR %in% c(Inf,NA)) sentence_3 = " The weekly ratio of reported cases cannot be calculated as no new cases have been reported in 1 of the last 2 weeks."
       else sentence_3 = " The weekly ratio of reported cases cannot be calculated as some cases have been redacted in one of the last 2 weeks."
-      sentence_4 = paste0(" The weekly ratio of reported deaths over the last 2 weeks is ", signif(current_country_deaths_WR,2), " (", toOrdinal(current_country_deaths_WR_rank),") and ", ratio_d_below_1, " statistically significantly below 1.")
+      sentence_4 = paste0(" The weekly ratio of reported deaths over the last 2 weeks is ", signif(current_country_deaths_WR,2), " (", toOrdinal(current_country_deaths_WR_rank),").")
     }
     else{
       if(current_country_deaths_WR %in% c(Inf,NA)) sentence_4 = " The weekly ratio of reported deaths cannot be calculated as no new deaths have been reported in one of the last 2 weeks."
       else sentence_4 = " The weekly ratio of reported deaths cannot be calculated as some deaths have been redacted in one of the last 2 weeks."
-      sentence_3 = paste0(" The weekly ratio of reported cases over the last 2 weeks  is ", signif(current_country_cases_WR,2), " (", toOrdinal(current_country_cases_WR_rank), ") and ", ratio_c_below_1, " statistically significantly below 1.")
+      sentence_3 = paste0(" The weekly ratio of reported cases over the last 2 weeks  is ", signif(current_country_cases_WR,2), " (", toOrdinal(current_country_cases_WR_rank), ").")
     }
     
   }
   else {
-    sentence_3 = paste0(" The weekly ratio of reported cases over the last 2 weeks is ", signif(current_country_cases_WR,2), " (", toOrdinal(current_country_cases_WR_rank), ") and ", ratio_c_below_1, " statistically significantly below 1.", " The weekly ratio of reported deaths over the last 2 weeks is " , signif(current_country_deaths_WR,2), " (", toOrdinal(current_country_deaths_WR_rank),") and ", ratio_d_below_1, " statistically significantly below 1.")
+    sentence_3 = paste0(" The weekly ratio of reported cases over the last 2 weeks is ", signif(current_country_cases_WR,2), " (", toOrdinal(current_country_cases_WR_rank), ").", " The weekly ratio of reported deaths over the last 2 weeks is " , signif(current_country_deaths_WR,2), " (", toOrdinal(current_country_deaths_WR_rank),").")
     sentence_4 = NULL
   }
   tibble(

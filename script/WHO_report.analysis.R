@@ -5,7 +5,7 @@
 
 # 1) SET UP ----
 
-today<- Sys.Date() - 8 # Set date as to that of the data to fetch.
+today<- Sys.Date() - 14 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
@@ -369,9 +369,7 @@ africa@data %<>% left_join(who_WR_data %>% select(-country), by=c("ISO_A3"="coun
 
 
 breaks <- classIntervals(africa@data$WR_cases, n = 9, style = "jenks", na.rm=T)$brks
-breaks[2]<-0.00001
 palgreen <- brewer.pal(9, name = "Greens")
-palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_cases", colNA = "grey", legend.nodata = "Non WHO Afro country",
            breaks=breaks, col=palgreen, legend.title.txt = "Ratio", legend.title.cex = 1, 
@@ -380,11 +378,9 @@ points(-23.3, -31, pch = 16, col = 'white', cex = 2)
 text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
 dev.off()
 
-# Map Dt DEATHS ----
+# Map WR DEATHS ----
 breaks <- classIntervals(africa@data$WR_deaths, n = 6, style = "jenks", na.rm=T)$brks
-breaks[2]<-0.00001
 palgreen <- brewer.pal(7, name = "Greens")
-palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_deaths", colNA = "grey", legend.nodata = "Non WHO Afro country",
            breaks=breaks, col=palgreen,legend.title.txt = "Ratio", legend.title.cex = 1, 
