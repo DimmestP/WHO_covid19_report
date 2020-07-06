@@ -9,7 +9,7 @@ today<- Sys.Date() - 1 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
-source('./script/sourced_functions_doublingTime_reports.R') # Source several functions used in the below script. See README file for details. 
+source('./script/sourced_functions_Weekly_Ratio_reports.R') # Source several functions used in the below script. See README file for details. 
 
 time_window<- 7 # Time window over which doubling time is calculated
 t2.define<- today
@@ -88,54 +88,6 @@ if(sum(is.na(WHO_cases_and_deaths$cases)) > 0 | sum(is.na(WHO_cases_and_deaths$d
 
 who_countrywide_data<- read_excel(paste0('./data/', today, '/WHO_Africa_data_', today, '.xlsx'), sheet = 'data for map') 
 
-# Calculate the current weekly ratio with confidence intervals
-weekly_ratios_ci <- function(A, B, altered){
-  if(altered > 0){
-    tab <- tibble(type = c("ratio_m","lci", "uci"),
-              est = c(-1, NA, NA))
-  }
-  else {
-    e <- sqrt(1/A + 1/B)
-    
-    est <- c(exp(log(A/B) - e * 1.96),
-             exp(log(A/B) + e * 1.96))
-    
-    tab <- tibble(type = c("ratio_m","lci", "uci"),
-                  est = c(A/B, est[[1]], est[[2]]))
-  }
-  return(tab)
-  
-}
-
-# loop weekly ratio test over all data 
-weekly_ratios_2 <- function(df, outcome, smooth_by = 7){
-  
-  df <- df %>% 
-    subset(date >= lubridate::ymd("2020-02-20")) %>%
-    filter(!is.na(.data[[outcome]])) %>% 
-    group_by(country) %>%
-    mutate(altered = .data[[outcome]] < 0, 
-           altered_window = roll_sumr(altered, n = smooth_by * 2),
-           change = roll_sumr(.data[[outcome]], n = smooth_by),
-           change_prev = lag(change, n = smooth_by),
-           ratio = change/change_prev) %>%
-    ungroup()
-  
-  df_long <- df %>%
-    filter(!is.na(ratio) & !is.infinite(ratio)) %>%
-    group_by(country,date) %>%
-    nest() %>%
-    mutate(tab = map(data, ~ weekly_ratios_ci(.x$change, .x$change_prev, .x$altered_window))) %>%
-    mutate(ratio = map_dbl(tab, ~parse_number(as.character((.x[1,2]))))) %>%
-    mutate(lci = map_dbl(tab, ~parse_number(as.character((.x[2,2]))))) %>% 
-    mutate(uci = map_dbl(tab, ~parse_number(as.character((.x[3,2]))))) %>% 
-    ungroup() %>%
-    select(date, country, ratio, lci, uci) 
-  
-  df_long
-  
-}
-
   WHO_cases_and_deaths_weekly_ratio <- WHO_cases_and_deaths %>%
   left_join(weekly_ratios_2(WHO_cases_and_deaths,"cases")) %>%
   left_join(weekly_ratios_2(WHO_cases_and_deaths,"deaths"), suffix= c("_c","_d"), by = c("country", "date"))
@@ -153,43 +105,6 @@ text(24, -43,"Total Reported Deaths", adj = 0,col="#CB181D",font=2,cex=6)
 text(44, -48,paste0(WHO_cases_and_deaths %>% filter(date == today) %>% pull(cum_deaths) %>% sum()), adj = 0,col="#CB181D",font=2,cex=6)
  dev.off()
 
-# DOUBLING TIMES: Incidence----
-# This sections computes
-# For incidence
-# the Doubling Time (Td) between t1 and t2 for each country
-# And simulate the epicurves (poisson error bootstraping)
-# To re-estimate Td on each simulation
-# To obtain a CI of the Td
-
-
-# Detect any negative values 
- WHO_cases_and_deaths_negative <- WHO_cases_and_deaths %>%
-  mutate(cases_positive = (cases > -1), deaths_positive = (deaths > -1)) %>%
-  group_by(country) %>%
-  mutate(calc_cases_dt = eight_day_pos_window(cases_positive), calc_deaths_dt = eight_day_pos_window(deaths_positive)) %>%
-   ungroup()
-
-# simulated datasets from bootstrapping
-WHO_cases_and_deaths_simulated <- WHO_cases_and_deaths_negative %>%
-  group_by(country,date) %>%
-  mutate(sim_deaths = map(iter,rpois_error,deaths,deaths_positive),sim_cases = map(iter,rpois_error,cases,cases_positive)) %>%
-  group_by(country) %>%
-  mutate(sim_cum_deaths = sim_cum_calc_per_pop(sim_deaths,1,deaths_positive),
-         sim_cum_cases = sim_cum_calc_per_pop(sim_cases,1,cases_positive),
-         sim_cum_deaths_per_10k = sim_cum_calc_per_pop(sim_deaths,popsize,deaths_positive),
-         sim_cum_cases_per_10k = sim_cum_calc_per_pop(sim_cases,popsize,cases_positive)) %>%
-  ungroup()
-
-# calculated doubling times for reported cases and for deaths
-WHO_cases_and_deaths_simulated_doubling_time<- WHO_cases_and_deaths_simulated %>%
-  group_by(country) %>%
-  summarise(sim_cases_doubling_times = Td.lapply(sim_cum_cases_per_10k,date,t1.define, t2.define, cases_positive,iter)) %>%
-  inner_join( 
-    WHO_cases_and_deaths_simulated %>%
-      group_by(country) %>%
-    summarise(sim_deaths_doubling_times = Td.lapply(sim_cum_deaths_per_10k,date,t1.define, t2.define, deaths_positive,iter))
-  ) %>% 
-  ungroup()
 
 # Get observed Td and CI from distribution of Td
 WHO_cases_and_deaths_doubling_time <- WHO_cases_and_deaths_simulated_doubling_time %>%
@@ -210,39 +125,6 @@ WHO_cases_and_deaths_doubling_time <- WHO_cases_and_deaths_simulated_doubling_ti
       group_by(country) %>%
       summarise(deaths_doubling_time = compute.td(cum_deaths_per_10k))
   )
-
-WHO_cases_and_deaths_doubling_time$cases_doubling_time[!(WHO_cases_and_deaths_negative %>% filter(date == max(date)) %>% pull(calc_cases_dt))] <- -1
-
-WHO_cases_and_deaths_doubling_time$deaths_doubling_time[!(WHO_cases_and_deaths_negative %>% filter(date == max(date)) %>% pull(calc_deaths_dt))] <- -1
-
-# calculate seven day cumulative increase
-WHO_cases_and_deaths_7_day_increase <- WHO_cases_and_deaths %>%
-  select(country,date) %>%
-  filter(date == today | date == (today - 7)) %>%
-  inner_join(WHO_cases_and_deaths_doubling_time %>%
-               ungroup() %>%
-               transmute(country,`doubling time`=cases_doubling_time))%>%
-  spread(key= date,value = `doubling time`) %>%
-  transmute(country, `2020-01-08` = 2^(7 / .[[3]]),`2020-01-01`=1) %>%
-  gather(key=date,value=cum_cases_relative_increase,-country)%>%
-  inner_join( 
-    WHO_cases_and_deaths %>%
-      select(country,date) %>%
-      filter(date == today | date == (today - 7)) %>%
-      inner_join(WHO_cases_and_deaths_doubling_time %>%
-                   ungroup() %>%
-                   transmute(country,`doubling time`=deaths_doubling_time))%>%
-      spread(key= date,value = `doubling time`) %>%
-      transmute(country, `2020-01-08` = 2^(7 / .[[3]]),`2020-01-01`=1) %>%
-      gather(key=date,value=cum_deaths_relative_increase,-country) 
-  ) %>%
-  mutate(date = ymd(date))
-
-WHO_cases_and_deaths_7_day_increase$cum_cases_relative_increase[!is.finite(WHO_cases_and_deaths_7_day_increase$cum_cases_relative_increase)] <- 1
-WHO_cases_and_deaths_7_day_increase$cum_deaths_relative_increase[!is.finite(WHO_cases_and_deaths_7_day_increase$cum_deaths_relative_increase)] <- 1
-WHO_cases_and_deaths_7_day_increase$date[WHO_cases_and_deaths_7_day_increase$date == "2020-01-08"] <- today
-WHO_cases_and_deaths_7_day_increase$date[WHO_cases_and_deaths_7_day_increase$date == "2020-01-01"] <- (today-7)
-
 
 # The TWO NEXT SECTIONS are to collect the Last day incidence of the observed data but ALSO OF THE SIMULATED DATA
 # that, to be able to report a 95%CI on the observed data
@@ -289,10 +171,11 @@ who_WR_data<- # Assemble the weekly ratios formatted for maps plotting
          WR_deaths = ratio_d,
          countryterritoryCode = ISO3)
 
-# Set the NA and Inf Dt to zero, so that they appear in white on the maps
+# Set the NA, -1 and Inf WR to zero, so that they appear in white on the maps
 who_WR_data$WR_cases[!is.finite(who_WR_data$WR_cases)]<- 0 
 who_WR_data$WR_deaths[!is.finite(who_WR_data$WR_deaths)]<- 0
-
+who_WR_data$WR_cases[who_WR_data$WR_cases < 0]<- 0 
+who_WR_data$WR_deaths[who_WR_data$WR_deaths < 0]<- 0
 
 
 # PRODUCE THE MAPS FOR THE REPORT ----
@@ -368,8 +251,11 @@ africa@data %<>% left_join(who_WR_data %>% select(-country), by=c("ISO_A3"="coun
 
 
 
-breaks <- classIntervals(africa@data$WR_cases, n = 9, style = "jenks", na.rm=T)$brks
+breaks <- classIntervals(africa@data$WR_cases, n = 7, style = "jenks", na.rm=T)$brks
+breaks <- c(0,breaks)
+breaks[2]<-0.0000001
 palgreen <- brewer.pal(9, name = "Greens")
+palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_cases", colNA = "grey", legend.nodata = "Non WHO Afro country",
            breaks=breaks, col=palgreen, legend.title.txt = "Ratio", legend.title.cex = 1, 
@@ -379,8 +265,11 @@ text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
 dev.off()
 
 # Map WR DEATHS ----
-breaks <- classIntervals(africa@data$WR_deaths, n = 6, style = "jenks", na.rm=T)$brks
-palgreen <- brewer.pal(7, name = "Greens")
+breaks <- classIntervals(africa@data$WR_deaths, n = 5, style = "jenks", na.rm=T)$brks
+breaks <- c(0,breaks)
+breaks[2]<-0.0000001
+palgreen <- brewer.pal(6, name = "Greens")
+palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_deaths", colNA = "grey", legend.nodata = "Non WHO Afro country",
            breaks=breaks, col=palgreen,legend.title.txt = "Ratio", legend.title.cex = 1, 

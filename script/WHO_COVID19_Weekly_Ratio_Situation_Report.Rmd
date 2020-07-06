@@ -39,7 +39,7 @@ knitr::opts_chunk$set(tidy = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 
 
-today <- Sys.Date() - 15
+today <- Sys.Date() - 4
 library(plyr)
 library(knitr)
 library(stringr)
@@ -48,7 +48,7 @@ library(cowplot)
 library(toOrdinal)
 library(tidyverse)
 load(paste0('../output/WHO_report_analysis_', as.character(today), '.RData'))
-source('../script/sourced_functions_doublingTime_reports.R')
+source('../script/sourced_functions_Weekly_Ratio_reports.R')
 
 
 ```
@@ -111,13 +111,15 @@ The maps below summarise the in-country situations:
  
 * Top row: cumulative reported cases (left) and deaths (right).  
 * Middle row: cumulative reported cases (left) and deaths (right) per 10,000 population on a log10 scale.  
-* Bottom row: overview of weekly ratios of cumulative reported cases (left) and deaths (right). Weekly ratios are calculated by dividing the sum of new cases/deaths over the most recent 7 days by the sum of new cases/deaths during the preceeding 7 days. Doubling times have been replaced by weekly ratios because as country specific epidemics decline doubling times become unreliable. The higher the weekly ratio the faster the national COVID-19 epidemic is growing with weekly ratios below 1 suggesting the epidemic is slowing.
+* Bottom row: weekly ratios for new cases and new deaths. The higher the weekly ratio, the faster an epidemic is growing. A weekly ratio of 1 represents stable growth (i.e. the number of cases or deaths in the past 7 days was the same as the 7 days before). A value between 1 and 0 indicates that an epidemic is in decline. See methods for more details.
 
 Caveats: 
 
 * Colour scales are non-linear and are re-calibrated every week.
 
 * WHO African region countries shaded in white either have no reported deaths/cases or, for weekly ratio calculations, have reduced their cumulative total cases/deaths in the last 14 days due to retrospective changes in reporting procedures.
+
+* Doubling times have been replaced by weekly ratios because some countries are moving out of the exponential phase of the epidemic.
 
 ## Summary maps
  
@@ -151,12 +153,26 @@ Caveats;
 ```{r plot_country_data,  fig.height = 10.5, fig.width = 9, fig.align = "center",results = "asis"}
 country_list <- WHO_cases_and_deaths %>% distinct(country) %>% pull(country)
 for( i in country_list){
-  current_country_data <- WHO_cases_and_deaths%>% 
+  # add column signifying data related to chosen country
+  current_country_data <- WHO_cases_and_deaths %>% 
     mutate(current_country = (country == i))
   
- current_country_WR <-  WHO_cases_and_deaths_weekly_ratio %>%
-   filter(date == today) %>%
-   mutate(current_country = (country == i))
+# add column signifying WR related to chosen country and remove countries with incomplete data and only data within last 8 days
+ current_country_WR_cases <-  WHO_cases_and_deaths_weekly_ratio %>%
+   select(date,country,ratio_c) %>%
+   filter(date > today - 8) %>%
+   mutate(current_country = (country == i)) %>% 
+   group_by(country) %>% 
+   filter(sum((ratio_c > 0 & is.finite(ratio_c))) == 8) %>%
+   ungroup()
+ 
+ current_country_WR_deaths <-  WHO_cases_and_deaths_weekly_ratio %>%
+   select(date,country,ratio_d) %>%
+   filter(date > today - 8) %>%
+   mutate(current_country = (country == i)) %>% 
+   group_by(country) %>% 
+   filter(sum((ratio_d > 0 & is.finite(ratio_d))) == 8) %>%
+   ungroup()
  
   
   # scale graphs according to current country
@@ -180,22 +196,22 @@ for( i in country_list){
     pull(cum_deaths_per_10k) %>%
     max()
   
-  current_country_max_cases_WR <- current_country_WR %>% 
+  current_country_max_cases_WR <- current_country_WR_cases %>% 
     filter(current_country) %>%
     pull(ratio_c) %>%
     max()
   
-  current_country_max_deaths_WR <- current_country_WR %>% 
+  current_country_max_deaths_WR <- current_country_WR_deaths %>% 
     filter(current_country) %>%
     pull(ratio_d) %>%
     max()
   
-  current_country_min_cases_WR <- current_country_WR %>% 
+  current_country_min_cases_WR <- current_country_WR_cases %>% 
     filter(current_country) %>%
     pull(ratio_c) %>%
     min()
   
-  current_country_min_deaths_WR <- current_country_WR %>% 
+  current_country_min_deaths_WR <- current_country_WR_deaths %>% 
     filter(current_country) %>%
     pull(ratio_d) %>%
     min()
@@ -213,7 +229,7 @@ for( i in country_list){
           axis.title.x = element_blank(),
           plot.title = element_text(hjust = 0.5)) +
     labs(title="Cases",y="Cumulative") +
-    scale_x_date(date_labels = "%b %d",breaks=c(today-105,today-84,today-63,today-42,today-21,today)) +
+    scale_x_date(date_labels = "%b %d",breaks=c(today-140,today-112,today-84,today-56,today-28,today )) +
     coord_cartesian(ylim = c(0,ifelse(current_country_max_cases > 40, current_country_max_cases,40)))
   
   # plot deaths
@@ -230,7 +246,7 @@ for( i in country_list){
           axis.title.y = element_blank(),
           plot.title = element_text(hjust = 0.5)) +
     labs(title = "Deaths") +
-    scale_x_date(date_labels = "%b %d",breaks=c(today-105,today-84,today-63,today-42,today-21,today)) +
+    scale_x_date(date_labels = "%b %d",breaks=c(today-140,today-112,today-84,today-56,today-28,today)) +
     coord_cartesian(ylim = c(0,ifelse(current_country_max_deaths > 20, current_country_max_deaths,20)))
   
   # plot cases per 10k
@@ -245,8 +261,8 @@ for( i in country_list){
     theme(panel.grid.major.y = element_line(colour = "lightgrey",size=0.02),
           axis.title.x = element_blank()) +
     labs(x="Date",y="Cumulative per 10k population") +
-    scale_y_log10(breaks = c(0.1,0.01,0.001,0.0001),labels = c("0.1","0.01","0.001","0.0001")) +
-    scale_x_date(date_labels = "%b %d",breaks=c(today-105,today-84,today-63,today-42,today-21,today)) +
+    scale_y_log10(breaks = c(1,0.1,0.01,0.001,0.0001),labels = c("1","0.1","0.01","0.001","0.0001")) +
+    scale_x_date(date_labels = "%b %d",breaks=c(today-140,today-112,today-84,today-56,today-28,today)) +
     coord_cartesian(ylim = c(0.00005,ifelse(current_country_max_cases_per_10k > 0.01, current_country_max_cases_per_10k,0.1)))
   
   # plot deaths per 10k
@@ -257,32 +273,35 @@ for( i in country_list){
     geom_line(data=current_country_data %>% filter(current_country,cum_deaths_per_10k>0),
               aes(x=date,y=cum_deaths_per_10k,group=NULL),
               colour="black",size = 0.8) +
-    scale_y_log10(breaks = c(0.1,0.01,0.001,0.0001),labels = c("0.1","0.01","0.001","0.0001")) +
+    scale_y_log10(breaks = c(1,0.1,0.01,0.001,0.0001),labels = c("1","0.1","0.01","0.001","0.0001")) +
     theme_classic(base_size = 15) +
     theme(panel.grid.major.y = element_line(colour = "lightgrey",size=0.02),
           axis.title.x = element_blank(),
           axis.title.y = element_blank())  +
-    scale_x_date(date_labels = "%b %d",breaks=c(today-105,today-84,today-63,today-42,today-21,today),limits = c(current_country_data %>% distinct(date) %>% pull(date) %>% min(),today))  +
+    scale_x_date(date_labels = "%b %d",breaks=c(today-140,today-112,today-84,today-56,today-28,today),limits = c(current_country_data %>% distinct(date) %>% pull(date) %>% min(),today))  +
     coord_cartesian(ylim = c(0.00005,ifelse(current_country_max_deaths_per_10k > 0.01, current_country_max_deaths_per_10k,0.01)))
  
   # plot last 7 cases weekly ratios
   seven_day_cum_cases <- ggplot() +
-    geom_line(data = current_country_WR %>% filter(!current_country), aes(x=date,y=ratio_c,group = country),colour = "lightgray") +
-    geom_line(data = current_country_WR %>% filter(current_country), aes(x=date,y=ratio_c,group=NULL),colour="black",size = 0.8) +
+    geom_line(data = current_country_WR_cases %>% filter(!current_country), aes(x=date,y=ratio_c,group = country),colour = "lightgray") +
+    geom_hline(yintercept = 1, colour = "red", alpha = 0.8) +
+    geom_line(data = current_country_WR_cases %>% filter(current_country), aes(x=date,y=ratio_c,group=NULL),colour="black",size = 0.8) +
     labs(x="Date", y = "Weekly Ratio") +
     theme_classic(base_size = 15) +
-    scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today)) +
-    coord_cartesian(ylim = c(ifelse(current_country_min_cases_WR > -1, -1, current_country_min_cases_WR),ifelse(current_country_max_cases_WR < 4, 4, current_country_max_cases_WR)))
+    theme(plot.margin = margin(0,15,0,0)) +
+    scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today - 5, today - 2, today)) +
+    coord_cartesian(ylim = c(ifelse(current_country_min_cases_WR > 0, -0.1, current_country_min_cases_WR),ifelse(current_country_max_cases_WR < 4, 4, current_country_max_cases_WR)),expand = FALSE)
   
    # plot last 7 deaths weekly ratios
   seven_day_cum_deaths <- ggplot() +
-    geom_line(data = current_country_WR %>% filter(!current_country), aes(x=date,y=ratio_d,group = country),colour="lightgray") +
-    geom_line(data = current_country_WR %>% filter(current_country), aes(x=date,y=ratio_d,group=NULL),colour="black",size = 0.8) +
+    geom_line(data = current_country_WR_deaths %>% filter(!current_country), aes(x=date,y=ratio_d,group = country),colour="lightgray") +
+    geom_hline(yintercept = 1, colour = "red", alpha = 0.5) +
+    geom_line(data = current_country_WR_deaths %>% filter(current_country), aes(x=date,y=ratio_d,group=NULL),colour="black",size = 0.8) +
     labs(x="Date") +
     theme_classic(base_size = 15) +
-    theme(axis.title.y = element_blank()) +
-    scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today)) +
-    coord_cartesian(ylim = c(ifelse(current_country_min_deaths_WR > -1, -1, current_country_min_deaths_WR), ifelse(current_country_max_deaths_WR < 4, 4 , current_country_max_deaths_WR)))
+    theme(axis.title.y = element_blank(), plot.margin = margin(0,15,0,0)) +
+    scale_x_date(date_labels = "%b %d",breaks = c(today - 7, today - 5, today - 2, today)) +
+    coord_cartesian(ylim = c(ifelse(current_country_min_deaths_WR > 0, -0.1, current_country_min_deaths_WR), ifelse(current_country_max_deaths_WR < 4,4, current_country_max_deaths_WR)),expand = FALSE)
     
   
   # combine plots
@@ -332,11 +351,8 @@ An online version of the report is available  at [https://dimmestp.shinyapps.io/
 
 ### Weekly Ratio calculations
 
-We have used ratios of both cases and deaths in the past week compared to the previous week (i.e. the total over the last 7 days as a ratio of the total over the previous 7 days) to monitor the weekly rate of spread of COVID-19. Weekly totals are considered as they are less prone to week day variations than the daily values.  
+ Weekly ratios are calculated by dividing the sum of new cases or deaths over the past 7 days by their respective sums in the 7 days prior.  The higher the weekly ratio, the faster an epidemic is growing. A weekly ratio of 1 represents stable growth (i.e. the number of cases or deaths in the past 7 days was the same as the 7 days before). A value between 1 and 0 indicates that an epidemic is in decline. A value of -1 has been assigned to countries which have removed cases or deaths from their cumulative counts. Doubling times have been replaced by weekly ratios because as countries move out of their exponential growth phases, doubling times become inappropriate and unreliable.
 
-There is some analogy between the ratios presented and the R number, and values of less than 1 (or greater than 1) might be expected to correspond to R numbers of less than (or greater than) 1. While their values will not be identical, a rudimentary conversion based on a serial interval of 6.48 days (as used in the ICL model) indicates they would be similar. For example, a ratio of 0.70 would correspond to R=0.72, a ratio of 0.80 to R=0.813, and a ratio of 0.90 to R=0.91 (R=Ratio(6.48/7)). However, this analogy assumes uniform reporting over the two week period used to calculate each ratio. Furthermore it should be borne in mind
-that each statistic reflects a different manifestation of the virus, and none are fully representative of the true underlying rate of spread of infection in the whole population. Death ratios are heavily influenced by the rate of spread to and within older age groups, and take less account of the rate of spread in younger age groups. Similarly cases and hospital in-patients predominantly include those with more severe symptoms, and so do not fully capture the rate of infection spread within the whole population. Nevertheless these statistics have clear value for monitoring the impact of the virus on health service requirements, and will
-still serve as broad indicators of the underlying rate of spread of the virus occurring 3-4 weeks earlier.
   
 Confidence intervals calculated using bootstrapping of a simulated dataset with Poisson error structure. 
 

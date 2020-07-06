@@ -8,6 +8,54 @@
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# Calculate the current weekly ratio with confidence intervals
+weekly_ratios_ci <- function(A, B, altered){
+  if(altered > 0){
+    tab <- tibble(type = c("ratio_m","lci", "uci"),
+                  est = c(-1, NA, NA))
+  }
+  else {
+    e <- sqrt(1/A + 1/B)
+    
+    est <- c(exp(log(A/B) - e * 1.96),
+             exp(log(A/B) + e * 1.96))
+    
+    tab <- tibble(type = c("ratio_m","lci", "uci"),
+                  est = c(A/B, est[[1]], est[[2]]))
+  }
+  return(tab)
+  
+}
+
+# loop weekly ratio test over all data 
+weekly_ratios_2 <- function(df, outcome, smooth_by = 7){
+  
+  df <- df %>% 
+    subset(date >= lubridate::ymd("2020-02-20")) %>%
+    filter(!is.na(.data[[outcome]])) %>% 
+    group_by(country) %>%
+    mutate(altered = .data[[outcome]] < 0, 
+           altered_window = roll_sumr(altered, n = smooth_by * 2),
+           change = roll_sumr(.data[[outcome]], n = smooth_by),
+           change_prev = lag(change, n = smooth_by),
+           ratio = change/change_prev) %>%
+    ungroup()
+  
+  df_long <- df %>%
+    filter(!is.na(ratio) & !is.infinite(ratio)) %>%
+    group_by(country,date) %>%
+    nest() %>%
+    mutate(tab = map(data, ~ weekly_ratios_ci(.x$change, .x$change_prev, .x$altered_window))) %>%
+    mutate(ratio = map_dbl(tab, ~parse_number(as.character((.x[1,2]))))) %>%
+    mutate(lci = map_dbl(tab, ~parse_number(as.character((.x[2,2]))))) %>% 
+    mutate(uci = map_dbl(tab, ~parse_number(as.character((.x[3,2]))))) %>% 
+    ungroup() %>%
+    select(date, country, ratio, lci, uci) 
+  
+  df_long
+  
+}
+
 # function to check that no cases/deaths have been redacted over the last 7 day window
 # as this would make any weekly ratio calculations impossible
 eight_day_pos_window <- function(positive){
