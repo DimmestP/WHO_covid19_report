@@ -5,7 +5,7 @@
 
 # 1) SET UP ----
 
-today<- Sys.Date() - 1 # Set date as to that of the data to fetch.
+today<- Sys.Date() - 5 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
@@ -106,25 +106,22 @@ text(44, -48,paste0(WHO_cases_and_deaths %>% filter(date == today) %>% pull(cum_
  dev.off()
 
 
-# Get observed Td and CI from distribution of Td
-WHO_cases_and_deaths_doubling_time <- WHO_cases_and_deaths_simulated_doubling_time %>%
-  group_by(country)%>%
-  transmute(
-    deaths_ci_low = round(quantile(sim_deaths_doubling_times[[1]], c(0.05), method = 6,na.rm = TRUE), 1)[[1]], 
-    deaths_ci_upp = round(quantile(sim_deaths_doubling_times[[1]], c(0.95), method = 6,na.rm = TRUE), 1)[[1]],
-    cases_ci_low = round(quantile(sim_cases_doubling_times[[1]], c(0.05), method = 6,na.rm = TRUE), 1)[[1]], 
-    cases_ci_upp = round(quantile(sim_cases_doubling_times[[1]], c(0.95), method = 6,na.rm = TRUE), 1)[[1]]) %>%
-  inner_join(
-    WHO_cases_and_deaths_simulated %>%
-      filter(date %in% c(t1.define,t2.define)) %>%
-      group_by(country) %>%
-      summarise(cases_doubling_time = compute.td(cum_cases_per_10k)))  %>%
-  inner_join(
-    WHO_cases_and_deaths_simulated %>%
-      filter(date %in% c(t1.define,t2.define)) %>%
-      group_by(country) %>%
-      summarise(deaths_doubling_time = compute.td(cum_deaths_per_10k))
-  )
+ WHO_cases_and_deaths_negative <- WHO_cases_and_deaths %>%
+   mutate(cases_positive = (cases > -1), deaths_positive = (deaths > -1)) %>%
+   group_by(country) %>%
+   mutate(calc_cases_dt = eight_day_pos_window(cases_positive), calc_deaths_dt = eight_day_pos_window(deaths_positive)) %>%
+   ungroup()
+ 
+ # simulated datasets from bootstrapping
+ WHO_cases_and_deaths_simulated <- WHO_cases_and_deaths_negative %>%
+   group_by(country,date) %>%
+   mutate(sim_deaths = map(iter,rpois_error,deaths,deaths_positive),sim_cases = map(iter,rpois_error,cases,cases_positive)) %>%
+   group_by(country) %>%
+   mutate(sim_cum_deaths = sim_cum_calc_per_pop(sim_deaths,1,deaths_positive),
+          sim_cum_cases = sim_cum_calc_per_pop(sim_cases,1,cases_positive),
+          sim_cum_deaths_per_10k = sim_cum_calc_per_pop(sim_deaths,popsize,deaths_positive),
+          sim_cum_cases_per_10k = sim_cum_calc_per_pop(sim_cases,popsize,cases_positive)) %>%
+   ungroup()
 
 # The TWO NEXT SECTIONS are to collect the Last day incidence of the observed data but ALSO OF THE SIMULATED DATA
 # that, to be able to report a 95%CI on the observed data
@@ -250,15 +247,21 @@ dev.off()
 africa@data %<>% left_join(who_WR_data %>% select(-country), by=c("ISO_A3"="countryterritoryCode"))
 
 
-
+# group country cases into similar values
 breaks <- classIntervals(africa@data$WR_cases, n = 7, style = "jenks", na.rm=T)$brks
+breaks[1]= 0.0000001
+
+# find groupings below 1 and above one to set red/green colours
+groups_less_than_one <- sum(breaks < 1)
+breaks[(groups_less_than_one + 1)] = 1
+
+palredgreen <- brewer.pal(7 - groups_less_than_one, name = "Greens")
+palredgreen <- c(rev(palredgreen),brewer.pal(groups_less_than_one, name = "Reds"))
+palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
-breaks[2]<-0.0000001
-palgreen <- brewer.pal(9, name = "Greens")
-palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_cases", colNA = "grey", legend.nodata = "Non WHO Afro country",
-           breaks=breaks, col=palgreen, legend.title.txt = "Ratio", legend.title.cex = 1, 
+           breaks=breaks, col=palredgreen, legend.title.txt = "Ratio", legend.title.cex = 1, 
            legend.values.cex = 1, legend.values.rnd = 3, legend.pos = c(-30,-35))
 points(-23.3, -31, pch = 16, col = 'white', cex = 2)
 text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
@@ -266,13 +269,18 @@ dev.off()
 
 # Map WR DEATHS ----
 breaks <- classIntervals(africa@data$WR_deaths, n = 5, style = "jenks", na.rm=T)$brks
+breaks[1]<-0.0000001
+# find groupings below 1 and above one to set red/green colours
+groups_less_than_one <- sum(breaks < 1)
+breaks[(groups_less_than_one + 1)] = 1
+
+palredgreen <- brewer.pal(5 - groups_less_than_one, name = "Greens")
+palredgreen <- c(rev(palredgreen),brewer.pal(groups_less_than_one, name = "Reds"))
+palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
-breaks[2]<-0.0000001
-palgreen <- brewer.pal(6, name = "Greens")
-palgreen[1]<-"#FFFFFF"
 png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
 choroLayer(spdf = africa, var = "WR_deaths", colNA = "grey", legend.nodata = "Non WHO Afro country",
-           breaks=breaks, col=palgreen,legend.title.txt = "Ratio", legend.title.cex = 1, 
+           breaks=breaks, col=palredgreen,legend.title.txt = "Ratio", legend.title.cex = 1, 
            legend.values.cex = 1, legend.values.rnd = 3, legend.pos = c(-30,-35))
 points(-23.3, -31, pch = 16, col = 'white', cex = 2)
 text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
