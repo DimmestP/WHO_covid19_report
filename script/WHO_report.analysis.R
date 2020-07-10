@@ -255,8 +255,8 @@ breaks[1]= 0.0000001
 groups_less_than_one <- sum(breaks < 1)
 breaks[(groups_less_than_one + 1)] = 1
 
-palredgreen <- brewer.pal(7 - groups_less_than_one, name = "Greens")
-palredgreen <- c(rev(palredgreen),brewer.pal(groups_less_than_one, name = "Reds"))
+palredgreen <- brewer.pal(groups_less_than_one, name = "Greens")
+palredgreen <- c(rev(palredgreen)[1:groups_less_than_one],brewer.pal(7 - groups_less_than_one, name = "Reds"))
 palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
 png(filename = paste0('./output/Map_WR_cases_', today, '_.png'), width=1920, height=1240, pointsize = 22)
@@ -272,9 +272,9 @@ breaks <- classIntervals(africa@data$WR_deaths, n = 4, style = "jenks", na.rm=T)
 breaks[1]<-0.0000001
 # find groupings below 1 and above one to set red/green colours
 groups_less_than_one <- sum(breaks < 1)
-breaks[(groups_less_than_one + 1)] = 1
+breaks[(groups_less_than_one + 1)] = 0.99999
 
-palredgreen <- brewer.pal(4 - groups_less_than_one, name = "Greens")
+palredgreen <- brewer.pal(groups_less_than_one, name = "Greens")
 palredgreen <- c(rev(palredgreen),"#FC9272")#brewer.pal(groups_less_than_one, name = "Reds"))
 palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
