@@ -5,7 +5,7 @@
 
 # 1) SET UP ----
 
-today<- Sys.Date() - 5 # Set date as to that of the data to fetch.
+today<- Sys.Date() - 1 # Set date as to that of the data to fetch.
 iter = 1000 # Number of iterations for the poisson error simulation (bootstrap), Set to 1000. Or 10 for a quick test.
 set.seed(as.numeric(today)) # setting seed allows repeatability of poisson error simulations. Use the date as a reference point for the seed.
 
@@ -268,14 +268,14 @@ text(-24, -30, 'Non reported or adjusted < 7 days ago', adj = 0)
 dev.off()
 
 # Map WR DEATHS ----
-breaks <- classIntervals(africa@data$WR_deaths, n = 5, style = "jenks", na.rm=T)$brks
+breaks <- classIntervals(africa@data$WR_deaths, n = 4, style = "jenks", na.rm=T)$brks
 breaks[1]<-0.0000001
 # find groupings below 1 and above one to set red/green colours
 groups_less_than_one <- sum(breaks < 1)
 breaks[(groups_less_than_one + 1)] = 1
 
-palredgreen <- brewer.pal(5 - groups_less_than_one, name = "Greens")
-palredgreen <- c(rev(palredgreen),brewer.pal(groups_less_than_one, name = "Reds"))
+palredgreen <- brewer.pal(4 - groups_less_than_one, name = "Greens")
+palredgreen <- c(rev(palredgreen),"#FC9272")#brewer.pal(groups_less_than_one, name = "Reds"))
 palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
 png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
