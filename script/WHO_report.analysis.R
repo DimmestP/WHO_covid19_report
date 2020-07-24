@@ -275,7 +275,7 @@ groups_less_than_one <- sum(breaks < 1)
 breaks[(groups_less_than_one + 1)] = 0.99999
 
 palredgreen <- brewer.pal(groups_less_than_one, name = "Greens")
-palredgreen <- c(rev(palredgreen),"#FC9272")#brewer.pal(groups_less_than_one, name = "Reds"))
+palredgreen <- c(rev(palredgreen)[1:groups_less_than_one],brewer.pal(4 - groups_less_than_one, name = "Reds"))
 palredgreen<-c("#FFFFFF",palredgreen)
 breaks <- c(0,breaks)
 png(filename = paste0('./output/Map_WR_deaths_', today, '_.png'), width=1920, height=1240, pointsize = 22)
